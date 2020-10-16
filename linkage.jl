@@ -7,11 +7,13 @@ struct Point
     y::Float64
 end
 
-struct Matrix
+struct Affine
     xx::Float64
     yx::Float64
     xy::Float64
     yy::Float64
+    Δx::Float64
+    Δy::Float64
 end
 
 function norm(a::Point)
@@ -30,16 +32,16 @@ function Base.:/(a::Point,b::Real)
     return Point(a.x/b, a.y/b)
 end
 
-function Base.:*(M::Matrix, a::Point)
-    return Point(M.xx*a.x+M.xy*a.y, M.yx*a.x+M.yy*a.y)
+function Base.:*(A::Affine, a::Point)
+    return Point(A.xx*a.x+A.xy*a.y+A.Δx, A.yx*a.x+A.yy*a.y+A.Δy)
 end
 
 function cci(a::Point,b::Point,r,s)
     L=norm(b-a)
     m=(r+s)/L
     n=(r-s)/L
-    M=Matrix(m*n, sqrt((m^2-1)*(1-n^2)), -sqrt((m^2-1)*(1-n^2)), m*n)
-    return (a+b)/2 + M*(b-a)/2
+    A=Affine(m*n, sqrt((m^2-1)*(1-n^2)), -sqrt((m^2-1)*(1-n^2)), m*n, 0, 0)
+    return (a+b)/2 + A*(b-a)/2
 end
 
 struct HolyNumbers
@@ -84,31 +86,6 @@ function lxrpt(q;unitlength = 5)
     Luxor.Point(unitlength*q.x,-unitlength*q.y)
 end
 
-
-w01 = 38.0
-w02 = 41.5
-w03 = 39.3
-w04 = 40.1
-w05 = 55.8
-w06 = 39.4
-w07 = 36.7
-w08 = 65.7
-w09 = 49.0
-w10 = 50.0
-w11 = 61.9
-w12 = 7.8
-w13 = 15.0
-
-
-holynumbers = HolyNumbers(w01,w02,w03,w04,w05,w06,w07,w08,w09,w10,w11,w12,w13)
-
-
-
-n=90
-ptss = [Points(2π*i/n,holynumbers) for i in 0:n-1]
-locus=[ptss[i].q8 for i in 1:n]
-
-
 function draw(filename, pts::Points, locus)
     q1 = pts.q1
     q2 = pts.q2
@@ -144,6 +121,32 @@ function draw(filename, pts::Points, locus)
     Luxor.preview()
 end
 
+
+w01 = 38.0
+w02 = 41.5
+w03 = 39.3
+w04 = 40.1
+w05 = 55.8
+w06 = 39.4
+w07 = 36.7
+w08 = 65.7
+w09 = 49.0
+w10 = 50.0
+w11 = 61.9
+w12 = 7.8
+w13 = 15.0
+
+holynumbers = HolyNumbers(w01,w02,w03,w04,w05,w06,w07,w08,w09,w10,w11,w12,w13)
+
+n=90
+ptss = [Points(2π*i/n,holynumbers) for i in 0:n-1]
+locus=[ptss[i].q8 for i in 1:n]
+
+function miny(locus)
+    return minimum(p.y for p in locus)
+end
+
+miny(locus)
 
 for i in 1:n
     draw("linkage$(lpad(i,3,"0")).png", ptss[i], locus)
