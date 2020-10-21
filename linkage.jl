@@ -44,6 +44,17 @@ function cci(a::Point,b::Point,r,s)
     return (a+b)/2 + A*(b-a)/2
 end
 
+const Locus = Vector{Point}
+
+function area(locus::Locus)
+    n = length(locus)
+    s = locus[1].x*locus[2].y-locus[1].y*locus[2].x
+    for i in 2:n
+        s += locus[i-1].x*locus[i].y-locus[i-1].y*locus[i].x
+    end
+    return s/2
+end
+
 struct HolyNumbers
     w01::Float64
     w02::Float64
@@ -59,6 +70,8 @@ struct HolyNumbers
     w12::Float64
     w13::Float64
 end
+
+Base.isless(h1::HolyNumbers, h2::HolyNumbers) = energy(h1)<energy(h2)
 
 struct Points
     q1::Point
@@ -82,12 +95,52 @@ struct Points
     end
 end
 
-const Locus = Vector{Point}
-
 function Locus(holynumbers::HolyNumbers; n::Int=90)
     ptss = [Points(2π*i/n,holynumbers) for i in 0:n-1]
     locus=[ptss[i].q8 for i in 1:n]
     return locus
+end
+
+## draw part
+function lrdu(pts::Points)
+    q1 = pts.q1
+    q2 = pts.q2
+    q3 = pts.q3
+    q4 = pts.q4
+    q5 = pts.q5
+    q6 = pts.q6
+    q7 = pts.q7
+    q8 = pts.q8
+
+    l = min(q1.x,q2.x,q3.x,q4.x,q5.x,q6.x,q7.x,q8.x)
+    r = max(q1.x,q2.x,q3.x,q4.x,q5.x,q6.x,q7.x,q8.x)
+    d = min(q1.y,q2.y,q3.y,q4.y,q5.y,q6.y,q7.y,q8.y)
+    u = max(q1.y,q2.y,q3.y,q4.y,q5.y,q6.y,q7.y,q8.y)
+
+    return [l,r,d,u]
+end
+
+function lrdu(locus::Locus)
+    xs = [q.x for q in locus]
+    ys = [q.y for q in locus]
+
+    l = minimum(xs)
+    r = maximum(xs)
+    d = minimum(ys)
+    u = maximum(ys)
+
+    return [l,r,d,u]
+end
+
+function lrdu(ptss::AbstractVector{Points})
+    tmp = hcat(lrdu.(ptss)...)
+
+    l = minimum(tmp[1,:])
+    r = maximum(tmp[2,:])
+    d = minimum(tmp[3,:])
+    u = maximum(tmp[4,:])
+
+    return [l,r,d,u]
 end
 
 function lxrpt(q;unitlength = 5)
@@ -150,10 +203,11 @@ holynumbers = HolyNumbers(w01,w02,w03,w04,w05,w06,w07,w08,w09,w10,w11,w12,w13)
 
 n=90
 ptss = [Points(2π*i/n,holynumbers) for i in 0:n-1]
-locus=Locus(holynumbers, n)
+locus=Locus(holynumbers, n=90)
 
+l,r,d,u = Int.(round.(lrdu(ptss)))
 for i in 1:n
-    draw("linkage$(lpad(i,3,"0")).png", ptss[i], locus)
+    draw("original_$(lpad(i,3,"0")).png", ptss[i], locus, up=u+5, down=d-5, right=r+5, left=l-5, unitlength=3)
 end
 
 ## Energy functions
@@ -166,11 +220,8 @@ function maxy(locus::Locus)
 end
 
 function energy(holynumbers::HolyNumbers; n=90)
-    energy(Locus(holynumbers,n=n))
+    energy(Locus(holynumbers, n=n))
 end
-
-locus = Locus(holynumbers, n=180)
-energy(locus)
 
 ## mcmc part
 function randnext(holynumbers::HolyNumbers)
@@ -215,6 +266,9 @@ end
 
 ## try
 function energy(locus::Locus)
+    E = 0.0
+    Y = miny(locus)
+    N = length(locus)
     # A: thinner
     # return maxy(locus)-miny(locus)
 
@@ -222,12 +276,11 @@ function energy(locus::Locus)
     # return (miny(locus)+92)^2
 
     # C: electric field
-    # s = 0.0
-    # Y = miny(locus)
-    # for q in locus
-    #     s += q.y - Y
-    # end
-    # return s/length(locus)
+    s = 0.0
+    for q in locus
+        s += (q.y - Y)^(1/2)
+    end
+    E += s/N
 
     # D: electric field
     # s = 0.0
@@ -235,9 +288,9 @@ function energy(locus::Locus)
     # for q in locus
     #     s += (q.y - Y)^(1/2)
     # end
-    # return s/length(locus)
+    # E += s/N
 
-    L,R,D,U = 0,200,-150,-50
+    L,R,D,U = 0,200,-200,-50
     l,r,d,u = lrdu(locus)
     l < L && return Inf
     r > R && return Inf
@@ -245,81 +298,40 @@ function energy(locus::Locus)
     u > U && return Inf
 
     # E: gravity near ground
-    s = 0.0
-    Y = miny(locus)
-    for q in locus
-        s += tanh(q.y - Y)
-    end
-    return s/length(locus)
+    # s = 0.0
+    # Y = miny(locus)
+    # for q in locus
+    #     s += (tanh(q.y - Y))^2
+    # end
+    # E += s/N
+
+    # area
+    E += (area(locus)+250)^2/10000
+
+    return E
 end
+
+area(locus)
+
+area(Locus(holynumbers))
+
 energy(holynumbers)
 holynumbers_log = iterate_mcmc(holynumbers,10000)
-energy(holynumbers_log[end])
-holynumbers_log = iterate_mcmc(holynumbers_log[end],10000, β=2.0)
-energy(holynumbers_log[end])
-holynumbers_log = iterate_mcmc(holynumbers_log[end],10000, β=4.0)
-energy(holynumbers_log[end])
-
-minimum(energy.(holynumbers_log))
-
-
-Base.isless(h1::HolyNumbers, h2::HolyNumbers) = energy(h1)<energy(h2)
-hoge = sort(holynumbers_log)
-
+energy(minimum(holynumbers_log))
+@time holynumbers_log = iterate_mcmc(minimum(holynumbers_log),10000, β=2.0)
+energy(minimum(holynumbers_log))
 
 ## hoge
-holynumbers′ = holynumbers
-holynumbers′ = holynumbers_log[end]
-holynumbers′ = hoge[1]
+holynumbers′ = minimum(holynumbers_log)
+# holynumbers′ = holynumbers_log[720]
 energy(holynumbers′)
 
 n=90
 ptss = [Points(2π*i/n,holynumbers′) for i in 0:n-1]
-locus=Locus(holynumbers′, n)
+locus=Locus(holynumbers′)
 
 l,r,d,u = Int.(round.(lrdu(ptss)))
 
 for i in 1:n
     draw("linkage_$(lpad(i,3,"0")).png", ptss[i], locus, up=u+5, down=d-5, right=r+5, left=l-5, unitlength=3)
-end
-
-function lrdu(pts::Points)
-    q1 = pts.q1
-    q2 = pts.q2
-    q3 = pts.q3
-    q4 = pts.q4
-    q5 = pts.q5
-    q6 = pts.q6
-    q7 = pts.q7
-    q8 = pts.q8
-
-    l = min(q1.x,q2.x,q3.x,q4.x,q5.x,q6.x,q7.x,q8.x)
-    r = max(q1.x,q2.x,q3.x,q4.x,q5.x,q6.x,q7.x,q8.x)
-    d = min(q1.y,q2.y,q3.y,q4.y,q5.y,q6.y,q7.y,q8.y)
-    u = max(q1.y,q2.y,q3.y,q4.y,q5.y,q6.y,q7.y,q8.y)
-
-    return [l,r,d,u]
-end
-
-function lrdu(locus::Locus)
-    xs = [q.x for q in locus]
-    ys = [q.y for q in locus]
-
-    l = minimum(xs)
-    r = maximum(xs)
-    d = minimum(ys)
-    u = maximum(ys)
-
-    return [l,r,d,u]
-end
-
-function lrdu(ptss::AbstractVector{Points})
-    tmp = hcat(lrdu.(ptss)...)
-
-    l = minimum(tmp[1,:])
-    r = maximum(tmp[2,:])
-    d = minimum(tmp[3,:])
-    u = maximum(tmp[4,:])
-
-    return [l,r,d,u]
 end
