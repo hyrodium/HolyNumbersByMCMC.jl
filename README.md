@@ -2,4 +2,4 @@
 
 In this repository, we will calculate the Holy Numbers of the strand beest.
 
-![](original_holynumbers.gif)
+![](output/org_000.gif)
