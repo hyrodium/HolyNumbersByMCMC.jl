@@ -16,11 +16,11 @@ w08 = 60
 w09 = 50
 w10 = 50
 w11 = 60
-w12 = 5
+w12 = -5
 w13 = 15
 
 holynumbers = HolyNumbers(w01,w02,w03,w04,w05,w06,w07,w08,w09,w10,w11,w12,w13)
-draw("initial.gif", holynumbers)
+draw("initial.gif", holynumbers, showlength=true)
 
 ## Energy functions
 
@@ -70,4 +70,4 @@ holynumbers_log = iterate_mcmc(best_holynumbers, energy, 10000, β=16.0)
 minimum(energy.(holynumbers_log))
 best_holynumbers = bestsolution(holynumbers_log, energy)
 
-draw("output/tmp_021.gif", best_holynumbers)
+draw("output/tmp_021.gif", best_holynumbers, showlength=true)

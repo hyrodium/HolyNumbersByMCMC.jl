@@ -83,10 +83,10 @@ struct Points
     q6::Point
     q7::Point
     q8::Point
-    function Points(t,holynumbers::HolyNumbers)
+    function Points(holynumbers::HolyNumbers, θ::Real)
         q1 = Point(0.0,0.0)
-        q2 = q1 + Point(w13*cos(t),w13*sin(t))
-        q3 = Point(holynumbers.w01,-holynumbers.w12)
+        q2 = q1 + Point(w13*cos(θ),w13*sin(θ))
+        q3 = Point(holynumbers.w01, holynumbers.w12)
         q4 = cci(q2,q3,holynumbers.w10,holynumbers.w02)
         q5 = cci(q3,q2,holynumbers.w03,holynumbers.w11)
         q6 = cci(q4,q3,holynumbers.w05,holynumbers.w04)
@@ -97,7 +97,7 @@ struct Points
 end
 
 function Locus(holynumbers::HolyNumbers; n::Int=90)
-    ptss = [Points(2π*i/n,holynumbers) for i in 0:n-1]
+    ptss = [Points(holynumbers, 2π*i/n) for i in 0:n-1]
     locus=[ptss[i].q8 for i in 1:n]
     return locus
 end
@@ -148,7 +148,7 @@ function lxrpt(q;unitlength = 5)
     Luxor.Point(unitlength*q.x,-unitlength*q.y)
 end
 
-function _linkagefig(pts::Points, locus::Locus; unitlength=5)
+function _linkagefig(pts::Points, locus::Locus; unitlength=5, showlength=false)
     q1 = pts.q1
     q2 = pts.q2
     q3 = pts.q3
@@ -157,6 +157,12 @@ function _linkagefig(pts::Points, locus::Locus; unitlength=5)
     q6 = pts.q6
     q7 = pts.q7
     q8 = pts.q8
+    q0 = Point(q1.x, q3.y)
+
+    segments = [(q1,q2), (q2,q4), (q3,q4), (q2,q5), (q3,q5), (q4,q6), (q3,q6), (q6,q7), (q5,q7), (q5,q8), (q7,q8)]
+    if showlength
+        append!(segments, [(q0,q1), (q0,q3)])
+    end
 
     Luxor.background(RGB(0.2,0.2,0.2))
 
@@ -167,7 +173,7 @@ function _linkagefig(pts::Points, locus::Locus; unitlength=5)
     Luxor.line(lxrpt(locus[end],unitlength=unitlength),lxrpt(locus[1],unitlength=unitlength),:stroke)
 
     Luxor.sethue("gray")
-    for (q_s,q_e) in [(q1,q2), (q2,q4), (q3,q4), (q2,q5), (q3,q5), (q4,q6), (q3,q6), (q6,q7), (q5,q7), (q5,q8), (q7,q8)]
+    for (q_s,q_e) in segments
         Luxor.line(lxrpt(q_s,unitlength=unitlength),lxrpt(q_e,unitlength=unitlength),:stroke)
     end
 
@@ -175,21 +181,48 @@ function _linkagefig(pts::Points, locus::Locus; unitlength=5)
     for q in [q1,q2,q3,q4,q5,q6,q7,q8]
         Luxor.circle(lxrpt(q,unitlength=unitlength),5,:fill)
     end
+
+    if showlength
+        Luxor.sethue("white")
+        Luxor.fontsize(20)
+        for (q_s,q_e) in segments
+            Luxor.text(string(round(norm(q_e-q_s), digits=4)),  lxrpt((q_s+q_e)/2), halign=:center, valign=:center)
+        end
+    end
 end
 
-function draw(filename, pts::Points, locus::Locus; up=5, down=-5, right=5, left=-5, unitlength=5)
+function draw(filename, pts::Points, locus::Locus; up=5, down=-5, right=5, left=-5, unitlength=5, showlength=false)
     Luxor.Drawing(unitlength*(right-left),unitlength*(up-down),filename)
     Luxor.origin(-unitlength*left,unitlength*up)
 
-    _linkagefig(pts, locus, unitlength=unitlength)
+    _linkagefig(pts, locus, unitlength=unitlength, showlength=showlength)
 
     Luxor.finish()
     Luxor.preview()
 end
 
-function draw(filename, holynumbers::HolyNumbers; n::Int=90, unitlength=5)
-    ptss = [Points(2π*i/n,holynumbers) for i in 0:n-1]
+function draw(filename, holynumbers::HolyNumbers, θ::Real; n::Int=90, unitlength=5, showlength=false)
+    ptss = [Points(holynumbers, 2π*i/n) for i in 0:n-1]
+    pts = Points(holynumbers, θ)
     locus = Locus(holynumbers, n=90)
+    l,r,d,u = Int.(round.(lrdu(ptss)))
+    up = u+5
+    down = d-5
+    right = r+5
+    left = l-5
+
+    Luxor.Drawing(unitlength*(right-left),unitlength*(up-down),filename)
+    Luxor.origin(-unitlength*left,unitlength*up)
+
+    _linkagefig(pts, locus, unitlength=unitlength, showlength=showlength)
+
+    Luxor.finish()
+    Luxor.preview()
+end
+
+function draw(filename, holynumbers::HolyNumbers; n::Int=90, unitlength=5, showlength=false)
+    ptss = [Points(holynumbers, 2π*i/n) for i in 0:n-1]
+    locus = Locus(holynumbers, n=n)
     l,r,d,u = Int.(round.(lrdu(ptss)))
     up = u+5
     down = d-5
@@ -198,7 +231,7 @@ function draw(filename, holynumbers::HolyNumbers; n::Int=90, unitlength=5)
 
     function frame(scene, framenumber)
         Luxor.origin(-unitlength*left,unitlength*up)
-        _linkagefig(ptss[framenumber], locus, unitlength=unitlength)
+        _linkagefig(ptss[framenumber], locus, unitlength=unitlength, showlength=showlength)
     end
 
     w = unitlength*(right-left)
