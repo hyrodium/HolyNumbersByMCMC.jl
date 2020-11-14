@@ -56,6 +56,47 @@ function area(locus::Locus)
     return s/2
 end
 
+function exteriorangle(p1::Point,p2::Point,p3::Point)
+    ax = p2.x-p1.x
+    ay = p2.y-p1.y
+    bx = p3.x-p2.x
+    by = p3.y-p2.y
+    return asin((ax*by-ay*bx)/sqrt((ax^2+ay^2)*(bx^2+by^2)))
+end
+
+function exteriorangle(locus::Locus)
+    n = length(locus)
+    angles = Vector{Float64}(undef,n)
+    angles[1] = exteriorangle(locus[n],locus[1],locus[2])
+    for i in 2:n-1
+        angles[i] = exteriorangle(locus[i-1],locus[i],locus[i+1])
+    end
+    angles[n] = exteriorangle(locus[n-1],locus[n],locus[1])
+    return angles
+end
+
+function speed(locus::Locus)
+    n = length(locus)
+    Δt = τ/n
+
+    speeds = Vector{Float64}(undef,n)
+    speeds[1] = norm(locus[n]-locus[2])/2Δt
+    for i in 2:n-1
+        speeds[i] = norm(locus[i-1]-locus[i+1])/2Δt
+    end
+    speeds[n] = norm(locus[n-1]-locus[1])/2Δt
+    return speeds
+end
+
+function curvature(locus::Locus)
+    n = length(locus)
+    Δt = τ/n
+    v = speed(locus)
+    α = exteriorangle(locus)
+
+    return α./(Δt*v)
+end
+
 struct HolyNumbers
     w01::Float64
     w02::Float64
@@ -85,7 +126,7 @@ struct Points
     q8::Point
     function Points(holynumbers::HolyNumbers, θ::Real)
         q1 = Point(0.0,0.0)
-        q2 = q1 + Point(w13*cos(θ),w13*sin(θ))
+        q2 = q1 + Point(holynumbers.w13*cos(θ),holynumbers.w13*sin(θ))
         q3 = Point(holynumbers.w01, holynumbers.w12)
         q4 = cci(q2,q3,holynumbers.w10,holynumbers.w02)
         q5 = cci(q3,q2,holynumbers.w03,holynumbers.w11)
@@ -241,25 +282,7 @@ function draw(filename, holynumbers::HolyNumbers; n::Int=90, unitlength=5, showl
 end
 
 # mcmc part
-
-function randnext(holynumbers::HolyNumbers)
-    w01 = holynumbers.w01 + randn()/4
-    w02 = holynumbers.w02 + randn()/4
-    w03 = holynumbers.w03 + randn()/4
-    w04 = holynumbers.w04 + randn()/4
-    w05 = holynumbers.w05 + randn()/4
-    w06 = holynumbers.w06 + randn()/4
-    w07 = holynumbers.w07 + randn()/4
-    w08 = holynumbers.w08 + randn()/4
-    w09 = holynumbers.w09 + randn()/4
-    w10 = holynumbers.w10 + randn()/4
-    w11 = holynumbers.w11 + randn()/4
-    w12 = holynumbers.w12 + randn()/4
-    w13 = 15.0
-    return HolyNumbers(w01,w02,w03,w04,w05,w06,w07,w08,w09,w10,w11,w12,w13)
-end
-
-function mcmcnext(X, energy::Function; β=1.0)
+function mcmcnext(X, randnext, energy::Function; β=1.0)
     X′ = randnext(X)
     E = energy(X)
     E′ = energy(X′)
@@ -267,11 +290,11 @@ function mcmcnext(X, energy::Function; β=1.0)
     return X′
 end
 
-function iterate_mcmc(X_init, energy::Function, N::Int; β=1.0)
+function iterate_mcmc(X_init, randnext, energy::Function, N::Int; β=1.0)
     X_tmp = X_init
     Xs = Array{typeof(X_init),1}(undef, N)
     for i in 1:N
-        X_tmp = mcmcnext(X_tmp, energy, β=β)
+        X_tmp = mcmcnext(X_tmp, randnext, energy, β=β)
         Xs[i] = X_tmp
     end
     return Xs
