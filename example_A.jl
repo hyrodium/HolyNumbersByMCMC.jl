@@ -84,7 +84,7 @@ function energy(locus::Locus)
     end
     E += s/n
 
-    # area
+    # Area
     E += (area(locus)-400)^2/20000
 
     # Limitation of curvature
