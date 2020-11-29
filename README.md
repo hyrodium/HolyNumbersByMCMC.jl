@@ -3,6 +3,8 @@
 ## Abstract
 This repository treats optimization of the [holy numbers](https://www.youtube.com/watch?v=FFS-2axFo1Y) of the strand beest by [MCMC](https://en.wikipedia.org/wiki/Markov_chain_Monte_Carlo).
 
+![](linkage.png)
+
 ## Usage
 ### Load modules
 ```julia
